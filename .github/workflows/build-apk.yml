@@ -81,7 +81,11 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
         run: |
           buildozer -v android debug 2>&1 | tee build.log
-          echo "Build exit code: $?"
+          BUILD_EXIT=$?
+          echo "Build exit code: $BUILD_EXIT"
+          ls -la bin/ 2>/dev/null || echo "bin/ directory not found"
+          ls -la *.apk 2>/dev/null || echo "No .apk in root"
+          exit $BUILD_EXIT
 
       # 8. 上传 APK 为 Artifact（构建完成后可在 Actions 页面下载）
       - name: Upload APK
@@ -92,10 +96,10 @@ jobs:
           path: bin/*.apk
           retention-days: 30
 
-      # 9. 如果构建失败，上传日志方便排查
-      - name: Upload build log on failure
+      # 9. 无论成功失败，都上传日志方便排查
+      - name: Upload build log
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: build-log
           path: build.log
