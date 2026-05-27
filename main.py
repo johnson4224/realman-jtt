@@ -39,14 +39,6 @@ if _cn_font:
 
 
 class CNLabel(Label):
-    font_name = "CN"
-
-
-class CNButton(Button):
-    font_name = "CN"
-
-
-class CNLabel(Label):
     def __init__(self, **kwargs):
         kwargs.setdefault("font_name", "CN")
         super().__init__(**kwargs)

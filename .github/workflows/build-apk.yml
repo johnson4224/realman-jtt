@@ -1,0 +1,105 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:   # 允许在 GitHub 网页上手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      # 1. 拉取代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 下载中文字体（思源黑体，开源免费）
+      - name: Download Chinese font
+        run: |
+          wget -q "https://github.com/adobe-fonts/source-han-sans/raw/release/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf" \
+               -O font.ttf || \
+          wget -q "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf" \
+               -O font.ttf
+          echo "Font size: $(wc -c < font.ttf) bytes"
+
+      # 3. 安装系统依赖（Buildozer 需要的工具链）
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-pip \
+            build-essential \
+            git \
+            ffmpeg \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libsdl2-mixer-dev \
+            libsdl2-ttf-dev \
+            libportmidi-dev \
+            libswscale-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            zlib1g-dev \
+            libgstreamer1.0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            autoconf \
+            libtool \
+            pkg-config \
+            libltdl-dev \
+            libffi-dev \
+            libssl-dev \
+            zip \
+            unzip \
+            openjdk-17-jdk
+
+      # 4. 安装 Python 依赖
+      - name: Install Python dependencies
+        run: |
+          pip3 install --upgrade pip
+          pip3 install buildozer cython==0.29.37
+
+      # 5. 缓存 Buildozer 的 .buildozer 目录，节省下次构建时间
+      - name: Cache buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-
+
+      # 6. 注入 API Key 环境变量（来自 GitHub Secrets）
+      - name: Set environment variables
+        run: |
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+          echo "OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}" >> $GITHUB_ENV
+
+      # 7. 打包 APK
+      - name: Build APK with Buildozer
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+        run: |
+          buildozer -v android debug 2>&1 | tee build.log
+          echo "Build exit code: $?"
+
+      # 8. 上传 APK 为 Artifact（构建完成后可在 Actions 页面下载）
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: family-secretary-apk
+          path: bin/*.apk
+          retention-days: 30
+
+      # 9. 如果构建失败，上传日志方便排查
+      - name: Upload build log on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
