@@ -81,11 +81,16 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # 8. 打包 APK
+      # 8. 把 API Key 写进 config.py（APK 里读不到环境变量，必须硬编码）
+      - name: Inject API Key into config.py
+        run: |
+          sed -i 's|API_KEY = os.environ.get("OPENAI_API_KEY", "")|API_KEY = "${{ secrets.OPENAI_API_KEY }}"|' config.py
+          sed -i 's|BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai-proxy.org/v1")|BASE_URL = "${{ secrets.OPENAI_BASE_URL }}"|' config.py
+          echo "=== config.py after injection ==="
+          cat config.py
+
+      # 9. 打包 APK
       - name: Build APK with Buildozer
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
         run: |
           buildozer -v android debug 2>&1 | tee build.log
           BUILD_EXIT=$?
